@@ -11,7 +11,7 @@ from collections import Counter
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
     def remove_articles(text):
-        return re.sub(r'\b(a|an|the)\b', ' ', text)
+        return re.sub(r'\b(a|an|the)\b', ' ',text)
 
     def white_space_fix(text):
         return ' '.join(text.split())
@@ -33,6 +33,13 @@ def normalize_answer(s):
     # return mod_s.replace(" ", "")
 
 
+##LEO
+import MeCab
+def reMeCab(word):
+    mecab = MeCab.Tagger('-r /dev/null -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd -Owakati')
+    word = mecab.parse(''.join(word)).strip('').split()
+
+
 # mod from org f1_score()
 # 引数にcontextを追加，contextの中で，predictionの形態素の位置が，ground_truthの形態素の位置と一致しているかどうかも考慮
 def f1_score(prediction, ground_truth, context):
@@ -40,16 +47,39 @@ def f1_score(prediction, ground_truth, context):
     # ground_truth_tokens = normalize_answer(ground_truth).split()
 
     # そもそも正解が含まれていないコンテキストの場合（大規模機械読解のタスクで起きる状況，普通の機械読解ではありえない）
-    if ground_truth not in context:
+    #if ground_truth not in context:
+    #    return 0
+
+    #回答不可能
+    if ground_truth == '' and prediction == '':
         return 0
 
     # 形態素にsplit
     ground_truth = ground_truth.split()
+    #print(f'ground_truth : {ground_truth}')
     prediction = prediction.split()
     context = context.split()
     ground_truth_tokens = list(map(lambda x: x, ground_truth))
     prediction_tokens = list(map(lambda x: x, prediction))
     context_tokens = list(map(lambda x: x, context))
+
+    #LEO
+    #import MeCab
+    #mecab = MeCab.Tagger('-r /dev/null -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd -Owakati')
+    #ground_truth_tokens = mecab.parse(''.join(ground_truth_tokens)).split()
+    #print(f'ground_truth_tokens: {ground_truth_tokens}')
+    #
+
+    reMeCab(ground_truth_tokens)
+    reMeCab(prediction_tokens)
+    reMeCab(context_tokens)
+    print(f'ground_truth_tokens: {ground_truth_tokens}')
+    print(f'prediction_tokens: {prediction_tokens}')
+    print(f'context_tokens: {context_tokens}')
+
+    #print(f"ground_truth_tokens: {ground_truth_tokens}")
+    #print(f"prediction_tokens: {prediction_tokens}")
+    #print(f"context_tokens: {context_tokens}")
 
     # ground_truth（参照用回答）の形態素がcontextの中にある位置のインデックスのリストを作成
     ground_truth_position_list = []
@@ -85,8 +115,8 @@ def f1_score(prediction, ground_truth, context):
 
             break
 
-    # print(ground_truth_position_list)
-    # print(prediction_position_list)
+    #print(f"ground_truth_position_list: {ground_truth_position_list}")
+    #print(f"prediction_position_list: {prediction_position_list}")
 
     # 位置が一致している形態素をカウント
     num_same = 0
@@ -94,7 +124,7 @@ def f1_score(prediction, ground_truth, context):
         if pred_position in ground_truth_position_list:
             num_same += 1
 
-    # print(num_same)
+    #print(f'num_same: {num_same}')
 
     # common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
     # num_same = sum(common.values())
@@ -182,10 +212,11 @@ def myevaluate(dataset):
             total_wa += 1
             exact_match_wa += my_metric_max_over_ground_truths(exact_match_score, prediction, ground_truths, context)
 
-        # print(ground_truths)
+        #print(f'ground_truths:{ground_truths}')
         # print(prediction)
 
         exact_match += my_metric_max_over_ground_truths(exact_match_score, prediction, ground_truths, context)
+        print(f'{total}: {exact_match}')
         f1 += my_metric_max_over_ground_truths(f1_score, prediction, ground_truths, context)
         # print(exact_match,f1)
 
@@ -207,6 +238,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Evaluation for TipsQA ' + expected_version)
     parser.add_argument('--result_file', help='Dataset file')
+    ##LEO 20220531
+    parser.add_argument('--column', help='the column name of predictions')
 
     # parser.add_argument('prediction_file', help='Prediction File')
     args = parser.parse_args()
@@ -221,7 +254,8 @@ if __name__ == '__main__':
         for row in dataset_csv:
             sample_list = []
             ans = row['answer']
-            pred = row['model_answer']
+            pred = row[args.column]
+            #pred = row['predictions']
             con = row['context']  # 位置情報を獲得するために，コンテキストも取り出す
             # print(normalize_answer(ans),normalize_answer(pred))
             sample_list.append(normalize_answer(ans))
